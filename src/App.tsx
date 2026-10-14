@@ -5,9 +5,12 @@ function App() {
 
   const script = `@echo off
 cd /d "%~dp0"
-echo CreateObject("WScript.Shell").Run "scrcpy --turn-screen-off --stay-awake",0,False>"%temp%\\_sc.vbs"
-wscript "%temp%\\_sc.vbs"
-del "%temp%\\_sc.vbs" 2>nul
+set "v=%temp%\\_sc.vbs"
+echo Set ws = CreateObject("WScript.Shell")> "%v%"
+echo ws.Run "cmd /c start """" scrcpy.exe --turn-screen-off --stay-awake", 0, False>> "%v%"
+start "" wscript "%v%"
+timeout /t 2 /nobreak >nul
+del "%v%" 2>nul
 exit`;
 
   const copy = () => {
@@ -40,7 +43,7 @@ exit`;
               <span className="text-2xl">✅</span> Un solo archivo .bat — Copia y pega esto
             </h2>
             <p className="text-gray-400 text-sm mb-5">
-              Este archivo hace todo automáticamente: genera un VBS temporal, lanza scrcpy con la pantalla apagada y la CMD completamente oculta, y se borra solo.
+              Este archivo genera un VBS temporal que usa <code className="bg-gray-800 px-1 rounded text-xs">start ""</code> para lanzar scrcpy como <strong className="text-white">proceso completamente independiente</strong>. Así scrcpy no se cierra cuando el BAT/VBS terminan. Sin CMD en la barra de tareas.
             </p>
 
             <div className="flex items-center justify-between mb-2">
@@ -70,25 +73,33 @@ exit`;
                 </div>
                 <div className="flex items-start gap-3 p-3">
                   <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">cd /d "%~dp0"</code>
-                  <span className="text-sm text-gray-400">Cambia a la carpeta donde está el .bat (donde también está scrcpy.exe)</span>
+                  <span className="text-sm text-gray-400">Cambia a la carpeta donde está el .bat (donde está scrcpy.exe)</span>
                 </div>
                 <div className="flex items-start gap-3 p-3">
                   <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">echo ... &gt; _sc.vbs</code>
-                  <span className="text-sm text-gray-400">Crea un archivo VBS temporal que lanza scrcpy con ventana oculta (<code className="text-yellow-400">0</code> = ventana invisible)</span>
+                  <span className="text-sm text-gray-400">Crea un VBS temporal. La clave: usa <code className="text-yellow-400">start ""</code> para que scrcpy sea un <strong>proceso independiente</strong> (no se cierra cuando el VBS termina)</span>
                 </div>
                 <div className="flex items-start gap-3 p-3">
-                  <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">wscript _sc.vbs</code>
-                  <span className="text-sm text-gray-400">Ejecuta el VBS — scrcpy se lanza sin ventana de CMD</span>
+                  <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">start "" wscript</code>
+                  <span className="text-sm text-gray-400">Lanza el VBS como proceso separado del BAT (así el BAT puede cerrarse sin afectar a scrcpy)</span>
                 </div>
                 <div className="flex items-start gap-3 p-3">
-                  <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">del _sc.vbs</code>
-                  <span className="text-sm text-gray-400">Borra el VBS temporal (se auto-limpia)</span>
+                  <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">timeout /t 2</code>
+                  <span className="text-sm text-gray-400">Espera 2 segundos a que el VBS lea el archivo y lance scrcpy</span>
                 </div>
                 <div className="flex items-start gap-3 p-3">
-                  <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">exit</code>
-                  <span className="text-sm text-gray-400">Cierra el BAT — <strong className="text-white">no queda nada en la barra de tareas</strong></span>
+                  <code className="text-emerald-400 font-mono text-xs whitespace-nowrap mt-0.5">del + exit</code>
+                  <span className="text-sm text-gray-400">Borra el VBS temporal y cierra el BAT — <strong className="text-white">no queda nada en la barra de tareas</strong></span>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-4 bg-yellow-950/30 border border-yellow-800/30 rounded-xl p-4">
+              <p className="text-sm text-yellow-300">
+                <i className="fas fa-key mr-1"></i>
+                <strong>¿Por qué el anterior no funcionaba?</strong> Sin <code className="bg-gray-800 px-1 rounded text-xs">start ""</code>, scrcpy era proceso hijo del VBS. Cuando el VBS terminaba, Windows mataba a scrcpy. 
+                Con <code className="bg-gray-800 px-1 rounded text-xs">start ""</code>, scrcpy se ejecuta como proceso independiente y sobrevive al cierre del VBS y del BAT.
+              </p>
             </div>
           </div>
         </section>
@@ -197,6 +208,17 @@ exit`;
             <span className="text-2xl">🔧</span> Si algo no funciona
           </h2>
           <div className="space-y-3">
+            <details className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden group">
+              <summary className="p-4 cursor-pointer hover:bg-gray-800/50 transition font-medium flex items-center justify-between text-sm">
+                <span>❌ scrcpy se abre y se cierra solo inmediatamente</span>
+                <i className="fas fa-chevron-down text-gray-600 group-open:rotate-180 transition-transform text-xs"></i>
+              </summary>
+              <div className="px-4 pb-4 text-sm text-gray-400 border-t border-gray-800 pt-3">
+                <p className="mb-2"><strong>Causa:</strong> scrcpy era proceso hijo del VBS/BAT. Cuando el padre terminaba, Windows mataba a scrcpy.</p>
+                <p><strong>Solución:</strong> Este script usa <code className="bg-gray-950 px-1 rounded text-green-300">start ""</code> para que scrcpy sea proceso independiente. Asegúrate de copiar la última versión del script de esta página.</p>
+              </div>
+            </details>
+
             <details className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden group">
               <summary className="p-4 cursor-pointer hover:bg-gray-800/50 transition font-medium flex items-center justify-between text-sm">
                 <span>❌ "scrcpy no se reconoce como comando"</span>
